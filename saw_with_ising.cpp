@@ -49,7 +49,7 @@ class saw_MC{
     int * trial_spins;
     float * h_fields;                              // Values of the local fields in the Ising/Potts model
     float max_field_value = 2;
-    float spin_coupling = 0.7;
+    float spin_coupling = 1.0;
     float energy = 0;
     float * energies;
     float * magnetization;
@@ -60,6 +60,8 @@ class saw_MC{
                                                       to propose a move, so I guess it's ok. To increase the efficiency one should compute only
                                                       the delta energy, but it's not so straighforward as the pivot is a global move. In this 
                                                       probably a trial_neighbour matrix will be needed*/
+    int ** trial_neighbours;
+
     std::random_device rd;                         // generates a random seed, to initialize a random engine
     std::mt19937 mt;
     std::uniform_real_distribution<double> uni_R;  // uniform in [0,1]. Used to acc/rej MC move
@@ -71,8 +73,10 @@ class saw_MC{
     int tr_signs[8][3] = {{1,1,1},{1,1,-1},{1,-1,1},{1,-1,-1},       
     {-1,1,1},{-1,1,-1},{-1,-1,1},{-1,-1,-1}};      // by combining perm's and sign comb's you obtain the 48 pivot moves
     linear_hash hash_saw;                          // We declare here the hash table that will be used for self-avoidance checks
+    //linear_hash trial_hash_saw;
     int * hashed_where;                            // at each attempted pivot you store here the hashed coordinates of the monomers
                                                    // :this is useful for quick cleanup of the hashtable.
+    int * trial_hashed_where;
     int n_hashes;                                  // Tells you in each self_av. check how many monomers you inserted in the hash table
     public:
         saw_MC(int,int);                           //constructor
@@ -80,8 +84,8 @@ class saw_MC{
         void try_pivot(int,int);
         int hash_function(int*,int,int*);
         bool check_saw(int); 
-        void compute_neighbour_list(int);          // if argument is 1 uses coord, if it is 0 uses trial_coord  
-        float compute_new_energy(void);
+        void compute_neighbour_list(int**, int**);          // if argument is 1 uses coord, if it is 0 uses trial_coord  
+        float compute_new_energy(int**);
         void spins_MC(void);
         void run(void);                  
 };
@@ -102,7 +106,7 @@ class saw_MC{
 */
 
 saw_MC::saw_MC(int x, int y) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
-                                uni_spins2(0,1), mt(rd()){   //CONSTRUCTOR
+                                uni_spins2(0,1), mt(1){   //CONSTRUCTOR
     n_mono = x;
     n_steps = y; 
     coord = new int*[n_mono];
@@ -114,11 +118,14 @@ saw_MC::saw_MC(int x, int y) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1)
     trial_spins = new int[n_mono];
     h_fields = new float[n_mono];
     neighbours = new int*[n_mono];
+    trial_neighbours = new int*[n_mono];
     hashed_where = new int[n_mono];
+    trial_hashed_where = new int[n_mono];
     for (int i = 0; i < n_mono; i++){
         coord[i] = new int[3];
         trial_coord[i] = new int[3];
         neighbours[i] = new int[7]; // 1st entry: number of neighbours--> the others are the neighbours if there are any
+        trial_neighbours[i] = new int[7];
     }
     for (int i = 0; i < n_mono; i++){
         coord[i][0] = i;
@@ -131,8 +138,10 @@ saw_MC::saw_MC(int x, int y) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1)
         trial_spins[i] = spins[i];
         h_fields[i] = 0;/*(uni_R(mt)-1)*max_field_value*2;  LET'S USE O-FIELDS FOR NOW TO SEE IF WE CAN QUALITATIVELY GET THE RESULTS FROM COLI' ET AL*/
         neighbours[i][0] = 0;     // starting from a straight rod no one has any neighbour
+        trial_neighbours[i][0] = 0;
         for (int j = 0; j < 5; j++){
             neighbours[i][j+1] = -1; // -1 means it's not associated to any of the mono's that are indexed from 0 to n_mono-1
+            trial_neighbours[i][j+1] = -1;
         }
     } // I initialize the structure as a fully extended polymer in the x-direction
       // with the first monomer anchored in the origin.
@@ -160,6 +169,7 @@ saw_MC::~saw_MC(){    // DESTRUCOR
         delete [] coord[i];
         delete [] trial_coord[i];
         delete [] neighbours[i];
+        delete [] trial_neighbours[i];
     }
     delete [] coord;
     delete [] trial_coord;
@@ -167,10 +177,12 @@ saw_MC::~saw_MC(){    // DESTRUCOR
     delete [] energies;
     delete [] magnetization;
     delete [] hashed_where;
+    delete [] trial_hashed_where;
     delete [] spins;
     delete [] trial_spins;
     delete [] h_fields;
     delete [] neighbours;
+    delete [] trial_neighbours;
 }
 
 
@@ -287,18 +299,19 @@ bool saw_MC::check_saw(int k){
 }
 
 
-void saw_MC::compute_neighbour_list(int trial_flag){ // this method is run only if the pivot was successful, otherwise it doesn't make sense
+void saw_MC::compute_neighbour_list(int **coo, int **near){ // this method is run only if the pivot was successful, otherwise it doesn't make sense
     for (int i_mono = 0; i_mono < n_mono; i_mono++){
-        neighbours[i_mono][0] = 0;  // number of neighbours of the i_mono-th monomer
-        for (int i = 1; i < 7; i++) { neighbours[i_mono][i] = -1; } // i starts from 1 here
+        near[i_mono][0] = 0;  // number of neighbours of the i_mono-th monomer
+        for (int i = 1; i < 7; i++) { near[i_mono][i] = -1; } // i starts from 1 here
         
         int neigh_coordinates[3];
-        if (trial_flag == 0){
+        /*if (trial_flag == 0){
             for (int i = 0; i < 3; i++){ neigh_coordinates[i] = trial_coord[i_mono][i];}
         }
         else{
             for (int i = 0; i < 3; i++){ neigh_coordinates[i] = coord[i_mono][i];}
-        }
+        }*/
+        for (int i = 0; i < 3; i++){ neigh_coordinates[i] = coo[i_mono][i];}
         
         
         for (int j = 0; j < 3; j++){
@@ -314,9 +327,9 @@ void saw_MC::compute_neighbour_list(int trial_flag){ // this method is run only 
                             is_neighbour = is_neighbour && (hash_saw.key_values[l%hash_saw.M][m] == neigh_coordinates[m]);
                         }
                         if (is_neighbour){
-                            neighbours[i_mono][0] += 1;
-                            int n_neigh = neighbours[i_mono][0];
-                            neighbours[i_mono][n_neigh] = hash_saw.monomer_index[l%hash_saw.M];
+                            near[i_mono][0] += 1;
+                            int n_neigh = near[i_mono][0];
+                            near[i_mono][n_neigh] = hash_saw.monomer_index[l%hash_saw.M];
                             break;
                         }
                     }
@@ -329,12 +342,12 @@ void saw_MC::compute_neighbour_list(int trial_flag){ // this method is run only 
     }
 }
 
-float saw_MC::compute_new_energy(){
+float saw_MC::compute_new_energy(int **near){
     float ENE = 0;
     for (int i_mono = 0; i_mono < n_mono; i_mono++){
         ENE = ENE - h_fields[i_mono] * spins[i_mono];
-        for (int j = 0; j < neighbours[i_mono][0]; j++){
-            if (( spins[i_mono] == spins[neighbours[i_mono][j+1]] ) && (spins[i_mono] != 0)) { 
+        for (int j = 0; j < near[i_mono][0]; j++){
+            if (( spins[i_mono] == spins[near[i_mono][j+1]] ) && (spins[i_mono] != 0)) { 
                 ENE = ENE - spin_coupling/2;
             }
         }
@@ -346,7 +359,7 @@ float saw_MC::compute_new_energy(){
 void saw_MC::spins_MC(){
     int n_flips = n_mono;
     //fill hash table
-    for (int i_mono = 0; i_mono < n_mono; i_mono++){
+    /*for (int i_mono = 0; i_mono < n_mono; i_mono++){
         int hash_mono = hash_function(hash_saw.a, hash_saw.M, coord[i_mono]);
         for (int i = hash_mono; i < hash_saw.M + hash_mono; i++){
             if(hash_saw.occupancy[i%hash_saw.M] == 0){ 
@@ -360,7 +373,7 @@ void saw_MC::spins_MC(){
             }
         }
     }
-    compute_neighbour_list(1);
+    compute_neighbour_list(coord, neighbours);*/
 
     // Now you can do as many spin flips as you wish with an annealed polymer configuration
     float acc;
@@ -405,19 +418,23 @@ void saw_MC::spins_MC(){
 
 
     //empty hash table
-    for (int i_mono = 0; i_mono < n_mono; i_mono++){
+    /*for (int i_mono = 0; i_mono < n_mono; i_mono++){
         hash_saw.occupancy[hashed_where[i_mono]] = 0;
-    }
+    }*/
 }
 
 
 void saw_MC::run(){
     std::cout << check_saw(1) << "\n";
-    compute_neighbour_list(1);
+    compute_neighbour_list(coord, neighbours);
     for (int i = 0; i < n_hashes; i++){
         hash_saw.occupancy[hashed_where[i]] = 0;
     }
-    energy = compute_new_energy();
+    for (int i = 0; i < n_hashes; i++){
+        hash_saw.occupancy[hashed_where[i]] = 0;
+    }
+    energy = compute_new_energy(neighbours);
+    //std::cout << energy << "\n";
 
     int n_acc = 0;
     int pivot_point;
@@ -455,15 +472,21 @@ void saw_MC::run(){
              *** 4) If you accept the move update the polymer config with the following for loop and
              5) also update the spin configuration
             ************************************************************************************************/
-            compute_neighbour_list(0);
-            trial_energy = compute_new_energy();
+            compute_neighbour_list(trial_coord, trial_neighbours);
+            trial_energy = compute_new_energy(trial_neighbours);
+            //std::cout << trial_energy << "\n";
             delta_energy = trial_energy - energy;
             if (delta_energy <= 0){ acceptance = 1; }
             else {acceptance = exp(-delta_energy); }
             if (acceptance > uni_R(mt)){
-                for (int i = pivot_point; i < n_mono; i++){
+                for (int i_mono = pivot_point; i_mono < n_mono; i_mono++){
                     for (int j = 0; j < 3; j++){
-                        coord[i][j] = trial_coord[i][j];
+                        coord[i_mono][j] = trial_coord[i_mono][j];
+                    }
+                }
+                for (int i_mono = 0; i_mono < n_mono; i_mono ++){
+                    for (int j = 0; j < 7; j++){
+                        neighbours[i_mono][j] = trial_neighbours[i_mono][j];
                     }
                 }
                 energy = trial_energy;
@@ -526,10 +549,11 @@ void saw_MC::run(){
 
 
 int main(int argc, char* argv[]){
+//int main(){
     stringstream string1(argv[1]);
     stringstream string2(argv[2]);
-    int N_monomers;
-    int simul_length;
+    int N_monomers = 300;
+    int simul_length = 330;
     string1 >> N_monomers;
     string2 >> simul_length;
     std::cout << argv[0] << "\n";
