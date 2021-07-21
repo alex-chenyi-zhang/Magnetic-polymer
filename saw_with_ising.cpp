@@ -49,7 +49,7 @@ class saw_MC{
     int * trial_spins;
     float * h_fields;                              // Values of the local fields in the Ising/Potts model
     float max_field_value = 2;
-    float spin_coupling = 1.0;
+    float spin_coupling;
     float energy = 0;
     float * energies;
     float * magnetization;
@@ -105,10 +105,11 @@ class saw_MC{
    that we will not exceed the simulation box.
 */
 
-saw_MC::saw_MC(int x, int y) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
+saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
                                 uni_spins2(0,1), mt(1){   //CONSTRUCTOR
     n_mono = x;
     n_steps = y; 
+    spin_coupling = j_spins;
     coord = new int*[n_mono];
     trial_coord = new int*[n_mono];
     Ree2 = new int[n_steps];
@@ -358,22 +359,6 @@ float saw_MC::compute_new_energy(int **near){
 
 void saw_MC::spins_MC(){
     int n_flips = n_mono;
-    //fill hash table
-    /*for (int i_mono = 0; i_mono < n_mono; i_mono++){
-        int hash_mono = hash_function(hash_saw.a, hash_saw.M, coord[i_mono]);
-        for (int i = hash_mono; i < hash_saw.M + hash_mono; i++){
-            if(hash_saw.occupancy[i%hash_saw.M] == 0){ 
-                hash_saw.occupancy[i%hash_saw.M] = 1;
-                hash_saw.monomer_index[i%hash_saw.M] = i_mono;
-                for (int j = 0; j < 3; j++){
-                    hash_saw.key_values[i%hash_saw.M][j] = coord[i_mono][j];
-                }
-                hashed_where[i_mono] = i%hash_saw.M;
-                break;
-            }
-        }
-    }
-    compute_neighbour_list(coord, neighbours);*/
 
     // Now you can do as many spin flips as you wish with an annealed polymer configuration
     float acc;
@@ -415,12 +400,6 @@ void saw_MC::spins_MC(){
             spins[flip_candidate] = trial_spin_value;
         }
     }
-
-
-    //empty hash table
-    /*for (int i_mono = 0; i_mono < n_mono; i_mono++){
-        hash_saw.occupancy[hashed_where[i_mono]] = 0;
-    }*/
 }
 
 
@@ -518,11 +497,11 @@ void saw_MC::run(){
     ofstream myfile3;
     ofstream myfile4;
     ofstream myfile5;
-    myfile.open ("final_config_" + to_string(n_mono) +".txt");
-    myfile2.open ("e2e_dist_" + to_string(n_mono) + ".txt");
-    myfile3.open ("energies_" + to_string(n_mono) + ".txt");
-    myfile4.open ("final_spinconf_" + to_string(n_mono) +".txt");
-    myfile5.open ("magnetization_" + to_string(n_mono) +".txt");
+    myfile.open ("final_config_" + to_string(n_mono) + "_" + to_string(spin_coupling) + ".txt");
+    myfile2.open ("e2e_dist_" + to_string(n_mono) + "_" + to_string(spin_coupling) + ".txt");
+    myfile3.open ("energies_" + to_string(n_mono) + "_" + to_string(spin_coupling) + ".txt");
+    myfile4.open ("final_spinconf_" + to_string(n_mono) + "_" + to_string(spin_coupling) +".txt");
+    myfile5.open ("magnetization_" + to_string(n_mono) + "_" + to_string(spin_coupling) + ".txt");
     for (int i = 0; i < n_mono; i++){
         for(int j = 0; j < 3; j++){
             myfile << coord[i][j] << ' ';
@@ -552,16 +531,20 @@ int main(int argc, char* argv[]){
 //int main(){
     stringstream string1(argv[1]);
     stringstream string2(argv[2]);
-    int N_monomers = 300;
-    int simul_length = 330;
+    stringstream string3(argv[3]);
+    int N_monomers;
+    int simul_length;
+    float J;
     string1 >> N_monomers;
     string2 >> simul_length;
+    string3 >> J;
     std::cout << argv[0] << "\n";
     std::cout << "The number of monomers is: " << N_monomers << "\n";
     std::cout << "The length of the simulation is: " << simul_length << "\n";
+    std::cout << "The coupling values is: " << J << "\n";
     
     
-    saw_MC simulation(N_monomers,simul_length); 
+    saw_MC simulation(N_monomers, simul_length, J); 
     simulation.run();
     /*std::cout << simulation.check_saw(1) << "\n";
     simulation.compute_neighbour_list();
