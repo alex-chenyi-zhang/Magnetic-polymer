@@ -80,7 +80,7 @@ class saw_MC{
         void try_pivot(int,int);
         int hash_function(int*,int,int*);
         bool check_saw(int); 
-        void compute_neighbour_list(int **, linear_hash);            
+        void compute_neighbour_list(int);          // if argument is 1 uses coord, if it is 0 uses trial_coord  
         float compute_new_energy(void);
         void spins_MC(void);
         void run(void);                  
@@ -279,35 +279,44 @@ bool saw_MC::check_saw(int k){
 
         t++;
     }
+
+    /*for (int i = 0; i < n_hashes; i++){
+        hash_saw.occupancy[hashed_where[i]] = 0;
+    }*/
     return is_saw;
 }
 
 
-void saw_MC::compute_neighbour_list(int **coordinates, linear_hash hash_coord){ // this method is run only if the pivot was successful, otherwise it doesn't make sense
+void saw_MC::compute_neighbour_list(int trial_flag){ // this method is run only if the pivot was successful, otherwise it doesn't make sense
     for (int i_mono = 0; i_mono < n_mono; i_mono++){
         neighbours[i_mono][0] = 0;  // number of neighbours of the i_mono-th monomer
         for (int i = 1; i < 7; i++) { neighbours[i_mono][i] = -1; } // i starts from 1 here
         
         int neigh_coordinates[3];
+        if (trial_flag == 0){
+            for (int i = 0; i < 3; i++){ neigh_coordinates[i] = trial_coord[i_mono][i];}
+        }
+        else{
+            for (int i = 0; i < 3; i++){ neigh_coordinates[i] = coord[i_mono][i];}
+        }
         
-        for (int i = 0; i < 3; i++){ neigh_coordinates[i] = coordinates[i_mono][i]; }
         
         for (int j = 0; j < 3; j++){
             for (int k = -1; k <= 1; k=k+2){
                 neigh_coordinates[j] += k;
 
-                int hash_neigh = hash_function(hash_coord.a, hash_coord.M, neigh_coordinates);
-                for (int l = hash_neigh; l < hash_coord.M + hash_neigh; l++){
-                    if(hash_coord.occupancy[l%hash_coord.M] == 0){break;}
+                int hash_neigh = hash_function(hash_saw.a, hash_saw.M, neigh_coordinates);
+                for (int l = hash_neigh; l < hash_saw.M + hash_neigh; l++){
+                    if(hash_saw.occupancy[l%hash_saw.M] == 0){break;}
                     else{
                         bool is_neighbour = true;
                         for (int m = 0; m< 3; m++){
-                            is_neighbour = is_neighbour && (hash_coord.key_values[l%hash_coord.M][m] == neigh_coordinates[m]);
+                            is_neighbour = is_neighbour && (hash_saw.key_values[l%hash_saw.M][m] == neigh_coordinates[m]);
                         }
                         if (is_neighbour){
                             neighbours[i_mono][0] += 1;
                             int n_neigh = neighbours[i_mono][0];
-                            neighbours[i_mono][n_neigh] = hash_coord.monomer_index[l%hash_coord.M];
+                            neighbours[i_mono][n_neigh] = hash_saw.monomer_index[l%hash_saw.M];
                             break;
                         }
                     }
@@ -351,7 +360,7 @@ void saw_MC::spins_MC(){
             }
         }
     }
-    compute_neighbour_list(coord, hash_saw);
+    compute_neighbour_list(1);
 
     // Now you can do as many spin flips as you wish with an annealed polymer configuration
     float acc;
@@ -404,7 +413,7 @@ void saw_MC::spins_MC(){
 
 void saw_MC::run(){
     std::cout << check_saw(1) << "\n";
-    compute_neighbour_list(coord, hash_saw);
+    compute_neighbour_list(1);
     for (int i = 0; i < n_hashes; i++){
         hash_saw.occupancy[hashed_where[i]] = 0;
     }
@@ -446,7 +455,7 @@ void saw_MC::run(){
              *** 4) If you accept the move update the polymer config with the following for loop and
              5) also update the spin configuration
             ************************************************************************************************/
-            compute_neighbour_list(trial_coord, hash_saw);
+            compute_neighbour_list(0);
             trial_energy = compute_new_energy();
             delta_energy = trial_energy - energy;
             if (delta_energy <= 0){ acceptance = 1; }
