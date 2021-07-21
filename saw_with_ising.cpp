@@ -79,7 +79,7 @@ class saw_MC{
     int * trial_hashed_where;
     int n_hashes;                                  // Tells you in each self_av. check how many monomers you inserted in the hash table
     public:
-        saw_MC(int,int);                           //constructor
+        saw_MC(int,int,float);                           //constructor
         ~saw_MC();                                 //destructor
         void try_pivot(int,int);
         int hash_function(int*,int,int*);
