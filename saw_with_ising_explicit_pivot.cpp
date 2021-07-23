@@ -188,7 +188,6 @@ saw_MC::~saw_MC(){    // DESTRUCOR
     delete [] trial_neighbours;
 }
 
-
 /* This function makes the g-th transformation on the k-th pivot point
    and stores the transformed configuration in trial_coord. One then 
    needs to check the self-avoidance of this new walk. If it OK it 
@@ -204,7 +203,7 @@ void saw_MC::try_pivot(int k, int g){
         }
     }
 
-    for (int i = pivot+1; i < n_mono; i++){ // Apply symmetry after the pivot
+    /*for (int i = pivot+1; i < n_mono; i++){ // Apply symmetry after the pivot
         int shifted_coord[3] = {};
         for (int j = 0; j < 3; j++){
             for (int l = 0; l < 3; l++){
@@ -215,6 +214,342 @@ void saw_MC::try_pivot(int k, int g){
         for (int j = 0; j < 3; j++){
             trial_coord[i][j] = shifted_coord[j]+coord[pivot][j];
         }
+    }*/
+    switch (symm) {
+        case 0:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][0];
+                trial_coord[i][1] = coord[i][1];
+                trial_coord[i][2] = -coord[i][2] + coord[pivot][2] + coord[pivot][2];
+            }
+            break;
+        case 1:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][0];
+                trial_coord[i][1] = -coord[i][1] + coord[pivot][1] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][2];
+            }
+            break;
+        case 2:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][0];
+                trial_coord[i][1] = -coord[i][1] + coord[pivot][1] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][2] + coord[pivot][2] + coord[pivot][2];
+            }
+            break;
+        case 3:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][0] + coord[pivot][0] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][1];
+                trial_coord[i][2] = coord[i][2];
+            }            
+            break;
+        case 4:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][0] + coord[pivot][0] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][1];
+                trial_coord[i][2] = -coord[i][2] + coord[pivot][2] + coord[pivot][2];
+            }         
+            break;
+        case 5:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][0] + coord[pivot][0] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][1] + coord[pivot][1] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][2];
+            }    
+            break;
+        case 6:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][0] + coord[pivot][0] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][1] + coord[pivot][1] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][2] + coord[pivot][2] + coord[pivot][2];
+            }
+            break;
+        case 7:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][0];
+                trial_coord[i][1] = coord[i][2] - coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][1] - coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 8:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][0];
+                trial_coord[i][1] = -coord[i][2] + coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][1] - coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 9:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][0];
+                trial_coord[i][1] = coord[i][2] - coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][1] + coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 10:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][0];
+                trial_coord[i][1] = -coord[i][2] + coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][1] + coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 11:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][0] + coord[pivot][0] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][2] - coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][1] - coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 12:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][0] + coord[pivot][0] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][2] + coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][1] - coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 13:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][0] + coord[pivot][0] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][2] - coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][1] + coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 14:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][0] + coord[pivot][0] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][2] + coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][1] + coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 15:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][1] - coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][0] - coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][2];
+            }
+            break;
+        case 16:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][1] - coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][0] - coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][2] + coord[pivot][2] + coord[pivot][2];
+            }
+            break;
+        case 17:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][1] + coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][0] - coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][2];
+            }
+            break;
+        case 18:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][1] + coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][0] - coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][2] + coord[pivot][2] + coord[pivot][2];
+            }
+            break;
+        case 19:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][1] - coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][0] + coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][2];
+            }
+            break;
+        case 20:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][1] - coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][0] + coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][2] + coord[pivot][2] + coord[pivot][2];
+            }
+            break;
+        case 21:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][1] + coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][0] + coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][2];
+            }
+            break;
+        case 22:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][1] + coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][0] + coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][2] + coord[pivot][2] + coord[pivot][2];
+            }
+            break;
+        case 23:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][2] - coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][0] - coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][1] - coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 24:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][2] + coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][0] - coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][1] - coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 25:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][2] - coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][0] - coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][1] + coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 26:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][2] + coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][0] - coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][1] + coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 27:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][2] - coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][0] + coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][1] - coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 28:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][2] + coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][0] + coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][1] - coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 29:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][2] - coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][0] + coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][1] + coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 30:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][2] + coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][0] + coord[pivot][0] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][1] + coord[pivot][1] + coord[pivot][2];
+            }
+            break;
+        case 31:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][1] - coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][2] - coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][0] - coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 32:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][1] - coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][2] + coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][0] - coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 33:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][1] + coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][2] - coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][0] - coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 34:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][1] + coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][2] + coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][0] - coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 35:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][1] - coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][2] - coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][0] + coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 36:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][1] - coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][2] + coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][0] + coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 37:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][1] + coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][2] - coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][0] + coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 38:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][1] + coord[pivot][1] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][2] + coord[pivot][2] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][0] + coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 39:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][2] - coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][1];
+                trial_coord[i][2] = coord[i][0] - coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        
+        case 40:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][2] + coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][1];
+                trial_coord[i][2] = coord[i][0] - coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 41:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][2] - coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][1] + coord[pivot][1] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][0] - coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 42:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][2] + coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][1] + coord[pivot][1] + coord[pivot][1];
+                trial_coord[i][2] = coord[i][0] - coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 43:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][2] - coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][1];
+                trial_coord[i][2] = -coord[i][0] + coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 44:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][2] + coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = coord[i][1];
+                trial_coord[i][2] = -coord[i][0] + coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 45:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = coord[i][2] - coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][1] + coord[pivot][1] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][0] + coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        case 46:
+            for (int i = pivot+1; i < n_mono; i++){
+                trial_coord[i][0] = -coord[i][2] + coord[pivot][2] + coord[pivot][0];
+                trial_coord[i][1] = -coord[i][1] + coord[pivot][1] + coord[pivot][1];
+                trial_coord[i][2] = -coord[i][0] + coord[pivot][0] + coord[pivot][2];
+            }
+            break;
+        
+        default:
+            std::cout << "Invalid pivot transformation!!!\n";
+
     }
 }
 
@@ -544,7 +879,6 @@ int main(int argc, char* argv[]){
     std::cout << "The number of monomers is: " << N_monomers << "\n";
     std::cout << "The length of the simulation is: " << simul_length << "\n";
     std::cout << "The coupling values is: " << J << "\n";
-    
     auto start = high_resolution_clock::now();
     saw_MC simulation(N_monomers, simul_length, J); 
     simulation.run();
