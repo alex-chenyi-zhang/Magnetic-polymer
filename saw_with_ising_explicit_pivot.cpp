@@ -68,6 +68,8 @@ class saw_MC{
     std::mt19937 mt;
     std::uniform_real_distribution<double> uni_R;  // uniform in [0,1]. Used to acc/rej MC move
     std::uniform_int_distribution<int> uni_I_poly; // uniform in [1,n_mono-1]. To pick a random monomer. We don't do pivots around the 0-th monomer 
+    std::uniform_int_distribution<int> uni_I_poly2;// uniform in [1,n_mono-3]. Needed for the one-bead-flip
+    std::uniform_int_distribution<int> uni_I_poly3;// uniform in [1,n_mono-4]. Needed for cranckshaft-type moves
     std::uniform_int_distribution<int> uni_G;      // uniform in [0,47-1]. To pick a random element of the symmetry group
     std::uniform_int_distribution<int> uni_spins;  // random number picked between {-1,0,+1}
     std::uniform_int_distribution<int> uni_spins2; // random number picked between {0,1}
@@ -108,7 +110,7 @@ class saw_MC{
 */
 
 saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
-                                uni_spins2(0,1), mt(1){   //CONSTRUCTOR
+                                uni_I_poly2(0,x-3), uni_I_poly3(0,x-4), uni_spins2(0,1), mt(1){   //CONSTRUCTOR
     n_mono = x;
     n_steps = y; 
     spin_coupling = j_spins;
@@ -780,14 +782,6 @@ void saw_MC::run(){
         
 
         if(is_still_saw){
-            /************************************************************************************************
-             HERE YOU WILL PUT THE CODE TO DO --> 
-             ***   1) Since the proposed pivot is successful update the list of neighbours for the monomers. 
-             2) Attempt a move on the spin config. using e.g. the Wolff algo
-             *** 3) Compute energy change due to 1) and 2) --> acceptance proba
-             *** 4) If you accept the move update the polymer config with the following for loop and
-             5) also update the spin configuration
-            ************************************************************************************************/
             compute_neighbour_list(trial_coord, trial_neighbours);
             trial_energy = compute_new_energy(trial_neighbours);
             //std::cout << trial_energy << "\n";
@@ -808,17 +802,6 @@ void saw_MC::run(){
                 energy = trial_energy;
                 n_acc++;
             }
-            /************************************************************************************************
-             Maybe the best way to have a more efficient MCMC is not the one shown above.
-             Another possible thing to try is to do the moves on the polymer configuration and on the spin
-             system separately. i.e. you propose and then accept/reject moves that are on either one of the
-             two sub-systems, but not both. NB -  You cannot just alternate deterministically move on 
-             polymer and on spins, doing so it is not granted that detailed balance is satisfied. What you
-             have to do instead is, at each MC step to pick randomly on which subsystem to perform the move.
-             This could be also beneficial because let's say the polymer degrees of freedom de-correlate 
-             much faster than the Ising d.o.f's. Then a possible solution could be to attempt Ising moves
-             with higher probability.
-            ************************************************************************************************/
         }
         // the next 3 lines clean up the hash table to make it ready again for use
         for (int i = 0; i < n_hashes; i++){
@@ -879,14 +862,15 @@ int main(int argc, char* argv[]){
     std::cout << "The number of monomers is: " << N_monomers << "\n";
     std::cout << "The length of the simulation is: " << simul_length << "\n";
     std::cout << "The coupling values is: " << J << "\n";
+    
+    
     auto start = high_resolution_clock::now();
     saw_MC simulation(N_monomers, simul_length, J); 
+    
+    
     simulation.run();
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     std::cout << duration.count() << "\n";
-    /*std::cout << simulation.check_saw(1) << "\n";
-    simulation.compute_neighbour_list();
-    std::cout << simulation.compute_new_energy() << "\n";*/
     return 0;
 }
