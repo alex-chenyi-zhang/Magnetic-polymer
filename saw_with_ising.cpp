@@ -68,6 +68,8 @@ class saw_MC{
     std::mt19937 mt;
     std::uniform_real_distribution<double> uni_R;  // uniform in [0,1]. Used to acc/rej MC move
     std::uniform_int_distribution<int> uni_I_poly; // uniform in [1,n_mono-1]. To pick a random monomer. We don't do pivots around the 0-th monomer 
+    std::uniform_int_distribution<int> uni_I_poly2;// uniform in [1,n_mono-3]. Needed for the one-bead-flip
+    std::uniform_int_distribution<int> uni_I_poly3;// uniform in [1,n_mono-4]. Needed for cranckshaft-type moves
     std::uniform_int_distribution<int> uni_G;      // uniform in [0,47-1]. To pick a random element of the symmetry group
     std::uniform_int_distribution<int> uni_spins;  // random number picked between {-1,0,+1}
     std::uniform_int_distribution<int> uni_spins2; // random number picked between {0,1}
@@ -77,7 +79,7 @@ class saw_MC{
     linear_hash hash_saw;                          // We declare here the hash table that will be used for self-avoidance checks
     int * hashed_where;                            // at each attempted pivot you store here the hashed coordinates of the monomers
                                                    // :this is useful for quick cleanup of the hashtable.
-    int * trial_hashed_where;
+    int * whos_hashed;                             // constains the sequence of monomers used for a self-av check
     int n_hashes;                                  // Tells you in each self_av. check how many monomers you inserted in the hash table
     public:
         saw_MC(int,int,float);                           //constructor
@@ -88,6 +90,9 @@ class saw_MC{
         void compute_neighbour_list(int**, int**);          // if argument is 1 uses coord, if it is 0 uses trial_coord  
         float compute_new_energy(int**);
         void spins_MC(void);
+        void remove_from_hash_table(int);
+        bool add_to_hash_table(int, int*);
+        void single_bead_flip(void);
         void run(void);                  
 };
 
@@ -103,7 +108,7 @@ class saw_MC{
 
 
 saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
-                                uni_spins2(0,1), mt(1){   //CONSTRUCTOR
+                                uni_I_poly2(0,x-3), uni_I_poly3(0,x-4), uni_spins2(0,1), mt(1){   //CONSTRUCTOR // mt(rd())--> This for a random seed
     n_mono = x;
     n_steps = y; 
     spin_coupling = j_spins;
@@ -118,7 +123,7 @@ saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1)
     neighbours = new int*[n_mono];
     trial_neighbours = new int*[n_mono];
     hashed_where = new int[n_mono];
-    trial_hashed_where = new int[n_mono];
+    whos_hashed = new int[n_mono];
     for (int i = 0; i < n_mono; i++){
         coord[i] = new int[3];
         trial_coord[i] = new int[3];
@@ -177,7 +182,7 @@ saw_MC::~saw_MC(){    // DESTRUCOR
     delete [] energies;
     delete [] magnetization;
     delete [] hashed_where;
-    delete [] trial_hashed_where;
+    delete [] whos_hashed;
     delete [] spins;
     delete [] trial_spins;
     delete [] h_fields;
@@ -215,11 +220,85 @@ int saw_MC::hash_function(int a[], int M, int coord_to_be_hashed[]){
     }
     return abs(sum)%M;
 }
+
+// This adds a lattice site to the hash table and tells you whether the site was already inserted or not
+bool saw_MC::add_to_hash_table(int i_mono, int coord_to_hash[]){
+    bool already_there = false;
+
+    int h_coord = hash_function(hash_saw.a, hash_saw.M, coord_to_hash);
+    for (int i = h_coord; i < hash_saw.M+h_coord; i++){
+        if(hash_saw.occupancy[i%hash_saw.M] == 0){ 
+            hash_saw.occupancy[i%hash_saw.M] = 1;
+            hash_saw.monomer_index[i%hash_saw.M] = i_mono;
+            for (int j = 0; j< 3; j++){
+                    hash_saw.key_values[i%hash_saw.M][j] = coord_to_hash[j];
+            }
+            hashed_where[i_mono] = i%hash_saw.M;
+            break;
+        }
+        else{
+            already_there = true;
+            for (int j = 0; j< 3; j++){
+                already_there = already_there && (hash_saw.key_values[i%hash_saw.M][j] == coord_to_hash[j]);
+            }
+            if (already_there){
+                break;
+            }
+        }
+    }
+    return already_there;
+}
+
+void saw_MC::remove_from_hash_table(int hash_address){
+    if(hash_saw.occupancy[hash_address] != 0){
+        hash_saw.occupancy[hash_address] = 0;   // delete the element you actually want to delete;
+        for (int i = hash_address + 1; i < hash_saw.M + hash_address + 1; i++){
+            if(hash_saw.occupancy[i] != 0){     // If the next element in the hash table is occupied, delete the element and insert it from scratch;
+                hash_saw.occupancy[i] = 0;
+                add_to_hash_table(hash_saw.monomer_index[i], hash_saw.key_values[i]);
+            }
+            else{
+                break;
+            }
+        }
+    }
+    else{
+        std::cout << "ERROR!! The element you're trying to remove does not exist!! \n";
+    }
+}
 /* The input is the pivot point used to generate the trial walk. 
    it is useful to know, as it is more convenient to check self
    avoidance from the pivot point outwards.
 */
 bool saw_MC::check_saw(int k){
+    int L = std::max(k,n_mono-1-k) + 1;
+    bool is_saw = true;
+    int t = 0;
+    n_hashes = 0;
+    bool there_already;
+    while(t<L && is_saw){
+        if (k+t < n_mono){
+            there_already = add_to_hash_table(k+t, trial_coord[k+t]);
+            if (there_already){ is_saw = false; }
+            else{
+                whos_hashed[n_hashes] = k+t;
+                n_hashes++;
+            }
+        }
+        if (k-t >= 0 && t != 0){
+            there_already = add_to_hash_table(k-t, trial_coord[k-t]);
+            if (there_already){ is_saw = false; }
+            else{
+                whos_hashed[n_hashes] = k-t;
+                n_hashes++;
+            }
+        }
+
+        t++;
+    }
+    return is_saw;
+}
+/*bool saw_MC::check_saw(int k){
     int L = std::max(k,n_mono-1-k) + 1;
     bool is_saw = true;
     int t = 0;
@@ -235,7 +314,8 @@ bool saw_MC::check_saw(int k){
                          hash_saw.key_values[i%hash_saw.M][j] = trial_coord[k+t][j];
                     }
 
-                    hashed_where[n_hashes] = i%hash_saw.M;
+                    hashed_where[k+t] = i%hash_saw.M;
+                    whos_hashed[n_hashes] = k+t;
                     n_hashes++;
 
                     break;
@@ -263,7 +343,8 @@ bool saw_MC::check_saw(int k){
                          hash_saw.key_values[i%hash_saw.M][j] = trial_coord[k-t][j];
                     }
 
-                    hashed_where[n_hashes] = i%hash_saw.M;
+                    hashed_where[k-t] = i%hash_saw.M;
+                    whos_hashed[n_hashes] = k-t;
                     n_hashes++;
 
                     break;
@@ -283,14 +364,33 @@ bool saw_MC::check_saw(int k){
         }
 
         t++;
-    }
+    }*/
 
     /*for (int i = 0; i < n_hashes; i++){
         hash_saw.occupancy[hashed_where[i]] = 0;
     }*/
-    return is_saw;
-}
+    //return is_saw;
+//}
 
+
+
+
+
+/*void saw_MC::single_bead_flip(){
+    int mono = uni_I_poly2(mt);
+    int dist = 0;
+    for (int j = 0; j < 3; j++){
+        dist += (trial_coord[mono+2][j] - trial_coord[mono][j])*(trial_coord[mono+2][j] - trial_coord[mono][j]);
+    }
+    if (dist == 2){  // i.e. if the bead in between form a bend of the polymer
+        int new_coord[3];
+        for (int j = 0; j < 3; j++){
+            new_coord[j] = trial_coord[mono][j] + trial_coord[mono+2][j] - trial_coord[mono+1][j];
+        }
+        int hash_new = hash_function(hash_saw.a, hash_saw.M, new_coord);
+    }
+
+}*/
 
 void saw_MC::compute_neighbour_list(int **coo, int **near){ // this method is run only if the pivot was successful, otherwise it doesn't make sense
     for (int i_mono = 0; i_mono < n_mono; i_mono++){
@@ -393,15 +493,13 @@ void saw_MC::run(){
     std::cout << check_saw(1) << "\n";
     compute_neighbour_list(coord, neighbours);
     for (int i = 0; i < n_hashes; i++){
-        hash_saw.occupancy[hashed_where[i]] = 0;
-    }
-    for (int i = 0; i < n_hashes; i++){
-        hash_saw.occupancy[hashed_where[i]] = 0;
+        hash_saw.occupancy[hashed_where[whos_hashed[i]]] = 0;
     }
     energy = compute_new_energy(neighbours);
     //std::cout << energy << "\n";
 
     int n_acc = 0;
+    int n_pivots = 0;
     int pivot_point;
     int transformation;
     bool is_still_saw;
@@ -429,6 +527,7 @@ void saw_MC::run(){
         
 
         if(is_still_saw){
+            n_pivots++;
             compute_neighbour_list(trial_coord, trial_neighbours);
             trial_energy = compute_new_energy(trial_neighbours);
             //std::cout << trial_energy << "\n";
@@ -452,13 +551,14 @@ void saw_MC::run(){
         }
         // the next 3 lines clean up the hash table to make it ready again for use
         for (int i = 0; i < n_hashes; i++){
-            hash_saw.occupancy[hashed_where[i]] = 0;
+            hash_saw.occupancy[hashed_where[whos_hashed[i]]] = 0;
         }
         
         spins_MC();  // here I run MC on the spin d.o.f's with the current polymer configuration
     }
 
-    std::cout << "Number of successful pivot moves: "<< n_acc << "\n";
+    std::cout << "Number of successful pivot moves: "<< n_pivots << "\n";
+    std::cout << "Number of actually accepted pivot moves: "<< n_acc << "\n";
     ofstream myfile;
     ofstream myfile2;
     ofstream myfile3;
