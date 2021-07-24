@@ -55,7 +55,7 @@ class saw_MC{
     float energy = 0;
     float * energies;
     float * magnetization;
-    int pivot_moves[47][3][3] = {};                // The 47 orthogonal transformations of the octahedral group (except identity)
+    int p_moves[47][2][3] = {};                // The 47 orthogonal transformations of the octahedral group (except identity)
 
     int ** neighbours;                             /* This is the list of the neighbours of each monomer. Needed to evaluate the hamiltonian.          
                                                       To compute energy is order n_mono, so is the same order of the other operations needed
@@ -75,7 +75,6 @@ class saw_MC{
     int tr_signs[8][3] = {{1,1,1},{1,1,-1},{1,-1,1},{1,-1,-1},       
     {-1,1,1},{-1,1,-1},{-1,-1,1},{-1,-1,-1}};      // by combining perm's and sign comb's you obtain the 48 pivot moves
     linear_hash hash_saw;                          // We declare here the hash table that will be used for self-avoidance checks
-    //linear_hash trial_hash_saw;
     int * hashed_where;                            // at each attempted pivot you store here the hashed coordinates of the monomers
                                                    // :this is useful for quick cleanup of the hashtable.
     int * trial_hashed_where;
@@ -102,10 +101,6 @@ class saw_MC{
 */
 
 
-/* The simulation box should have a side which has length 2*N_mono and one
-   end of the polymer should be fixed in the origin. In this way we're sure
-   that we will not exceed the simulation box.
-*/
 
 saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
                                 uni_spins2(0,1), mt(1){   //CONSTRUCTOR
@@ -153,13 +148,15 @@ saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1)
 
     std::cout << "You have initialized your polymer configuration!!!\n";
 
-    // Now initialize the array containing the matrices of the pivot moves
+    // Now initialize the array containing the information for the different transformations
     int count = 0;
     for (int i = 0; i < 6; i++){
         for (int j = 0; j < 8; j++){
             if(i==0 && j==0) {continue;} //we don't care about identity
             for (int k = 0; k < 3; k++){
-                pivot_moves[count][perms[i][k]][k] = tr_signs[j][k];
+                //p_moves[count][k][perms[i][k]] = tr_signs[j][k];
+                p_moves[count][0][k] = perms[i][k];
+                p_moves[count][1][k] = tr_signs[j][k];
             }
             count++;
         }
@@ -204,16 +201,9 @@ void saw_MC::try_pivot(int k, int g){
         }
     }
 
-    for (int i = pivot+1; i < n_mono; i++){ // Apply symmetry after the pivot
-        int shifted_coord[3] = {};
+    for (int i = pivot + 1; i < n_mono; i++){
         for (int j = 0; j < 3; j++){
-            for (int l = 0; l < 3; l++){
-                shifted_coord[j] += pivot_moves[symm][j][l]*(coord[i][l]-coord[pivot][l]);
-            }
-        }
-
-        for (int j = 0; j < 3; j++){
-            trial_coord[i][j] = shifted_coord[j]+coord[pivot][j];
+            trial_coord[i][j] = p_moves[symm][1][j]*(coord[i][p_moves[symm][0][j]] - coord[pivot][p_moves[symm][0][j]]) + coord[pivot][j];
         }
     }
 }
@@ -308,12 +298,6 @@ void saw_MC::compute_neighbour_list(int **coo, int **near){ // this method is ru
         for (int i = 1; i < 7; i++) { near[i_mono][i] = -1; } // i starts from 1 here
         
         int neigh_coordinates[3];
-        /*if (trial_flag == 0){
-            for (int i = 0; i < 3; i++){ neigh_coordinates[i] = trial_coord[i_mono][i];}
-        }
-        else{
-            for (int i = 0; i < 3; i++){ neigh_coordinates[i] = coord[i_mono][i];}
-        }*/
         for (int i = 0; i < 3; i++){ neigh_coordinates[i] = coo[i_mono][i];}
         
         
@@ -445,14 +429,6 @@ void saw_MC::run(){
         
 
         if(is_still_saw){
-            /************************************************************************************************
-             HERE YOU WILL PUT THE CODE TO DO --> 
-             ***   1) Since the proposed pivot is successful update the list of neighbours for the monomers. 
-             2) Attempt a move on the spin config. using e.g. the Wolff algo
-             *** 3) Compute energy change due to 1) and 2) --> acceptance proba
-             *** 4) If you accept the move update the polymer config with the following for loop and
-             5) also update the spin configuration
-            ************************************************************************************************/
             compute_neighbour_list(trial_coord, trial_neighbours);
             trial_energy = compute_new_energy(trial_neighbours);
             //std::cout << trial_energy << "\n";
@@ -473,17 +449,6 @@ void saw_MC::run(){
                 energy = trial_energy;
                 n_acc++;
             }
-            /************************************************************************************************
-             Maybe the best way to have a more efficient MCMC is not the one shown above.
-             Another possible thing to try is to do the moves on the polymer configuration and on the spin
-             system separately. i.e. you propose and then accept/reject moves that are on either one of the
-             two sub-systems, but not both. NB -  You cannot just alternate deterministically move on 
-             polymer and on spins, doing so it is not granted that detailed balance is satisfied. What you
-             have to do instead is, at each MC step to pick randomly on which subsystem to perform the move.
-             This could be also beneficial because let's say the polymer degrees of freedom de-correlate 
-             much faster than the Ising d.o.f's. Then a possible solution could be to attempt Ising moves
-             with higher probability.
-            ************************************************************************************************/
         }
         // the next 3 lines clean up the hash table to make it ready again for use
         for (int i = 0; i < n_hashes; i++){
@@ -551,8 +516,5 @@ int main(int argc, char* argv[]){
     auto stop = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(stop - start);
     std::cout << duration.count() << "\n";
-    /*std::cout << simulation.check_saw(1) << "\n";
-    simulation.compute_neighbour_list();
-    std::cout << simulation.compute_new_energy() << "\n";*/
     return 0;
 }
