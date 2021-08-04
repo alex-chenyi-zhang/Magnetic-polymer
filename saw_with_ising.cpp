@@ -19,6 +19,8 @@ class linear_hash{
         ~linear_hash();
 };
 
+
+
 linear_hash::linear_hash(){
     occupancy = new int[M];
     monomer_index = new int[M];
@@ -33,6 +35,8 @@ linear_hash::linear_hash(){
     }
 }
 
+
+
 linear_hash::~linear_hash(){
     for (int i = 0; i < M; i++){
         delete [] key_values[i];
@@ -41,6 +45,8 @@ linear_hash::~linear_hash(){
     delete [] occupancy;
     delete [] monomer_index;
 }
+
+
 
 class saw_MC{
     int n_mono, n_steps;
@@ -73,6 +79,7 @@ class saw_MC{
     std::uniform_int_distribution<int> uni_G;      // uniform in [0,47-1]. To pick a random element of the symmetry group
     std::uniform_int_distribution<int> uni_spins;  // random number picked between {-1,0,+1}
     std::uniform_int_distribution<int> uni_spins2; // random number picked between {0,1}
+    std::uniform_int_distribution<int> local_move_rand;  // allows you to choose one of the 4 implemented local moves
     int perms[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
     int tr_signs[8][3] = {{1,1,1},{1,1,-1},{1,-1,1},{1,-1,-1},       
     {-1,1,1},{-1,1,-1},{-1,-1,1},{-1,-1,-1}};      // by combining perm's and sign comb's you obtain the 48 pivot moves
@@ -92,9 +99,14 @@ class saw_MC{
         void spins_MC(void);
         void remove_from_hash_table(int);
         bool add_to_hash_table(int, int*);
+        bool check_site_occupancy(int, int*);
         void single_bead_flip(void);
+        void crankshaft_180(void);
+        void crankshaft_90_270(int);
         void run(void);                  
 };
+
+
 
 /*********************************************************************************************/
 /*********************************************************************************************/
@@ -104,11 +116,8 @@ class saw_MC{
    attributes of the class. It takes for now as parameters the 
    number of MC steps the simulation lasts and the length of the polymer
 */
-
-
-
 saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
-                                uni_I_poly2(0,x-3), uni_I_poly3(0,x-4), uni_spins2(0,1), mt(1){   //CONSTRUCTOR // mt(rd())--> This for a random seed
+                                uni_I_poly2(0,x-3), uni_I_poly3(0,x-4), local_move_rand(0,3), uni_spins2(0,1), mt(1){   //CONSTRUCTOR // mt(rd())--> This for a random seed
     n_mono = x;
     n_steps = y; 
     spin_coupling = j_spins;
@@ -191,6 +200,8 @@ saw_MC::~saw_MC(){    // DESTRUCOR
 }
 
 
+
+/*********************************************************************************************/
 /* This function makes the g-th transformation on the k-th pivot point
    and stores the transformed configuration in trial_coord. One then 
    needs to check the self-avoidance of this new walk. If it OK it 
@@ -213,6 +224,9 @@ void saw_MC::try_pivot(int k, int g){
     }
 }
 
+
+
+/*********************************************************************************************/
 int saw_MC::hash_function(int a[], int M, int coord_to_be_hashed[]){
     int sum = 0;
     for (int i = 0; i < 3; i++){
@@ -221,6 +235,31 @@ int saw_MC::hash_function(int a[], int M, int coord_to_be_hashed[]){
     return abs(sum)%M;
 }
 
+
+
+
+/*********************************************************************************************/
+bool saw_MC::check_site_occupancy(int i_mono, int coord_to_hash[]){
+    bool already_there = false;
+    int h_coord = hash_function(hash_saw.a, hash_saw.M, coord_to_hash);
+    for (int i = h_coord; i < hash_saw.M+h_coord; i++){
+        if(hash_saw.occupancy[i%hash_saw.M] == 0){ 
+            break;
+        }
+        else{
+            already_there = true;
+            for (int j = 0; j< 3; j++){
+                already_there = already_there && (hash_saw.key_values[i%hash_saw.M][j] == coord_to_hash[j]);
+            }
+            if (already_there){
+                break;
+            }
+        }
+    }
+    return already_there;
+
+}
+/*********************************************************************************************/
 // This adds a lattice site to the hash table and tells you whether the site was already inserted or not
 bool saw_MC::add_to_hash_table(int i_mono, int coord_to_hash[]){
     bool already_there = false;
@@ -249,6 +288,9 @@ bool saw_MC::add_to_hash_table(int i_mono, int coord_to_hash[]){
     return already_there;
 }
 
+
+
+/*********************************************************************************************/
 void saw_MC::remove_from_hash_table(int hash_address){
     if(hash_saw.occupancy[hash_address] != 0){
         hash_saw.occupancy[hash_address] = 0;   // delete the element you actually want to delete;
@@ -266,6 +308,9 @@ void saw_MC::remove_from_hash_table(int hash_address){
         std::cout << "ERROR!! The element you're trying to remove does not exist!! \n";
     }
 }
+
+
+/*********************************************************************************************/
 /* The input is the pivot point used to generate the trial walk. 
    it is useful to know, as it is more convenient to check self
    avoidance from the pivot point outwards.
@@ -298,100 +343,149 @@ bool saw_MC::check_saw(int k){
     }
     return is_saw;
 }
-/*bool saw_MC::check_saw(int k){
-    int L = std::max(k,n_mono-1-k) + 1;
-    bool is_saw = true;
-    int t = 0;
-    n_hashes = 0;
-    while(t<L && is_saw){
-        if (k+t < n_mono){
-            int h_plus = hash_function(hash_saw.a, hash_saw.M, trial_coord[k+t]);
-            for (int i = h_plus; i < hash_saw.M + h_plus; i++){
-                if(hash_saw.occupancy[i%hash_saw.M] == 0){ 
-                    hash_saw.occupancy[i%hash_saw.M] = 1;
-                    hash_saw.monomer_index[i%hash_saw.M] = k+t;
-                    for (int j = 0; j< 3; j++){
-                         hash_saw.key_values[i%hash_saw.M][j] = trial_coord[k+t][j];
-                    }
-
-                    hashed_where[k+t] = i%hash_saw.M;
-                    whos_hashed[n_hashes] = k+t;
-                    n_hashes++;
-
-                    break;
-                }
-                else{
-                    bool already_there = true;
-                    for (int j = 0; j< 3; j++){
-                        already_there = already_there && (hash_saw.key_values[i%hash_saw.M][j] == trial_coord[k+t][j]);
-                    }
-                    if (already_there){
-                        is_saw = false;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (k-t >= 0 && t != 0){
-            int h_minus= hash_function(hash_saw.a, hash_saw.M, trial_coord[k-t]);
-            for (int i = h_minus; i < hash_saw.M+h_minus; i++){
-                if(hash_saw.occupancy[i%hash_saw.M] == 0){ 
-                    hash_saw.occupancy[i%hash_saw.M] = 1;
-                    hash_saw.monomer_index[i%hash_saw.M] = k-t;
-                    for (int j = 0; j< 3; j++){
-                         hash_saw.key_values[i%hash_saw.M][j] = trial_coord[k-t][j];
-                    }
-
-                    hashed_where[k-t] = i%hash_saw.M;
-                    whos_hashed[n_hashes] = k-t;
-                    n_hashes++;
-
-                    break;
-                }
-
-                else{
-                    bool already_there = true;
-                    for (int j = 0; j< 3; j++){
-                        already_there = already_there && (hash_saw.key_values[i%hash_saw.M][j] == trial_coord[k-t][j]);
-                    }
-                    if (already_there){
-                        is_saw = false;
-                        break;
-                    }
-                }
-            }
-        }
-
-        t++;
-    }*/
-
-    /*for (int i = 0; i < n_hashes; i++){
-        hash_saw.occupancy[hashed_where[i]] = 0;
-    }*/
-    //return is_saw;
-//}
 
 
 
-
-
-/*void saw_MC::single_bead_flip(){
+/*********************************************************************************************/
+void saw_MC::single_bead_flip(){
     int mono = uni_I_poly2(mt);
+    //std::cout << mono << "\n";
     int dist = 0;
     for (int j = 0; j < 3; j++){
         dist += (trial_coord[mono+2][j] - trial_coord[mono][j])*(trial_coord[mono+2][j] - trial_coord[mono][j]);
     }
     if (dist == 2){  // i.e. if the bead in between form a bend of the polymer
+        int address_to_empty = hashed_where[mono+1];
         int new_coord[3];
         for (int j = 0; j < 3; j++){
             new_coord[j] = trial_coord[mono][j] + trial_coord[mono+2][j] - trial_coord[mono+1][j];
         }
-        int hash_new = hash_function(hash_saw.a, hash_saw.M, new_coord);
+
+        bool there_already;
+        there_already = check_site_occupancy(mono+1, new_coord);
+        if (!there_already){
+            for (int j = 0; j < 3; j++){
+                trial_coord[mono+1][j] = new_coord[j];
+            }
+            remove_from_hash_table(address_to_empty);
+            add_to_hash_table(mono+1, new_coord);
+        }
     }
+    
+}
 
-}*/
 
+
+/*********************************************************************************************/
+void saw_MC::crankshaft_90_270(int verso){
+    // verso +1 means clockwise (90 degrees), -1 is 270
+    int mono = uni_I_poly3(mt);
+    int dist = 0;
+    for (int j = 0; j < 3; j++){
+        dist += (trial_coord[mono+3][j] - trial_coord[mono][j])*(trial_coord[mono+3][j] - trial_coord[mono][j]);
+    }
+    if (dist == 1){  // i.e. the chosen 3 segment long subchain forms a U-shape
+        int new_coord1[3];
+        int new_coord2[3];
+        int axis;
+        int orient;
+        for (int j = 0; j < 3; j++){
+            if ((trial_coord[mono+3][j] - trial_coord[mono][j]) != 0){
+                axis = j;
+                orient = trial_coord[mono+3][j] - trial_coord[mono][j];
+                break;
+            }
+        }
+
+        switch (axis) {
+            case 0:
+                new_coord1[0] = trial_coord[mono+1][0];
+                new_coord1[1] = trial_coord[mono][1] - (trial_coord[mono+1][2]-trial_coord[mono][2])*orient*verso;
+                new_coord1[2] = trial_coord[mono][2] + (trial_coord[mono+1][1]-trial_coord[mono][1])*orient*verso;
+
+                new_coord2[0] = trial_coord[mono+2][0];
+                new_coord2[1] = trial_coord[mono+3][1] - (trial_coord[mono+2][2]-trial_coord[mono+3][2])*orient*verso;
+                new_coord2[2] = trial_coord[mono+3][2] + (trial_coord[mono+2][1]-trial_coord[mono+3][1])*orient*verso;
+                break;
+            case 1:
+                new_coord1[0] = trial_coord[mono][0] + (trial_coord[mono+1][2]-trial_coord[mono][2])*orient*verso;
+                new_coord1[1] = trial_coord[mono+1][1];
+                new_coord1[2] = trial_coord[mono][2] - (trial_coord[mono+1][0]-trial_coord[mono][0])*orient*verso;
+
+                new_coord2[0] = trial_coord[mono+3][0] + (trial_coord[mono+2][2]-trial_coord[mono+3][2])*orient*verso;
+                new_coord2[1] = trial_coord[mono+2][1];
+                new_coord2[2] = trial_coord[mono+3][2] - (trial_coord[mono+2][0]-trial_coord[mono+3][0])*orient*verso;
+                break;
+            case 2:
+                new_coord1[0] = trial_coord[mono][0] - (trial_coord[mono+1][1]-trial_coord[mono][1])*orient*verso;
+                new_coord1[1] = trial_coord[mono][1] + (trial_coord[mono+1][0]-trial_coord[mono][0])*orient*verso;
+                new_coord1[2] = trial_coord[mono+1][2];
+
+                new_coord2[0] = trial_coord[mono+3][0] - (trial_coord[mono+2][1]-trial_coord[mono+3][1])*orient*verso;
+                new_coord2[1] = trial_coord[mono+3][1] + (trial_coord[mono+2][0]-trial_coord[mono+3][0])*orient*verso;
+                new_coord2[2] = trial_coord[mono+2][2];
+                break;
+            default:
+                std::cout << "!!! Invalid rotation axis !!! \n";
+        }
+
+        bool there_already1;
+        bool there_already2;
+        there_already1 = check_site_occupancy(mono+1, new_coord1);
+        there_already2 = check_site_occupancy(mono+2, new_coord2);
+        if (!there_already1 && !there_already2){
+            //std::cout << "WOOOOOOOW\n\n";
+            for (int j = 0; j < 3; j++){
+                trial_coord[mono+1][j] = new_coord1[j];
+                trial_coord[mono+2][j] = new_coord2[j];
+            }
+            int address_to_empty1 = hashed_where[mono+1];
+            remove_from_hash_table(address_to_empty1);
+            int address_to_empty2 = hashed_where[mono+2];
+            remove_from_hash_table(address_to_empty2);
+
+            add_to_hash_table(mono+1, new_coord1);
+            add_to_hash_table(mono+2, new_coord2);
+        }
+    }
+}
+
+/*********************************************************************************************/
+void saw_MC::crankshaft_180(){
+    int mono = uni_I_poly3(mt);
+    int dist = 0;
+    for (int j = 0; j < 3; j++){
+        dist += (trial_coord[mono+3][j] - trial_coord[mono][j])*(trial_coord[mono+3][j] - trial_coord[mono][j]);
+    }
+    if (dist == 1){  // i.e. the chosen 3 segment long subchain forms a U-shape
+        int new_coord1[3];
+        int new_coord2[3];
+        for (int j = 0; j < 3; j++){
+            new_coord1[j] = 2 * trial_coord[mono][j] - trial_coord[mono+1][j];
+            new_coord2[j] = 2 * trial_coord[mono+3][j] - trial_coord[mono+2][j];
+        }
+
+        bool there_already1;
+        bool there_already2;
+        there_already1 = check_site_occupancy(mono+1, new_coord1);
+        there_already2 = check_site_occupancy(mono+2, new_coord2);
+        if (!there_already1 && !there_already2){
+            //std::cout << "WOOOOOOOW\n\n";
+            for (int j = 0; j < 3; j++){
+                trial_coord[mono+1][j] = new_coord1[j];
+                trial_coord[mono+2][j] = new_coord2[j];
+            }
+            int address_to_empty1 = hashed_where[mono+1];
+            remove_from_hash_table(address_to_empty1);
+            int address_to_empty2 = hashed_where[mono+2];
+            remove_from_hash_table(address_to_empty2);
+
+            add_to_hash_table(mono+1, new_coord1);
+            add_to_hash_table(mono+2, new_coord2);
+        }
+    }
+}
+/*********************************************************************************************/
 void saw_MC::compute_neighbour_list(int **coo, int **near){ // this method is run only if the pivot was successful, otherwise it doesn't make sense
     for (int i_mono = 0; i_mono < n_mono; i_mono++){
         near[i_mono][0] = 0;  // number of neighbours of the i_mono-th monomer
@@ -524,34 +618,78 @@ void saw_MC::run(){
             std::cout << "i_step = "<< i << ' '<<pivot_point << ' ' << transformation <<' '<< is_still_saw << "\n";
         }
 
-        
-
-        if(is_still_saw){
-            n_pivots++;
-            compute_neighbour_list(trial_coord, trial_neighbours);
-            trial_energy = compute_new_energy(trial_neighbours);
-            //std::cout << trial_energy << "\n";
-            delta_energy = trial_energy - energy;
-            if (delta_energy <= 0){ acceptance = 1; }
-            else {acceptance = exp(-delta_energy); }
-            if (acceptance > uni_R(mt)){
-                for (int i_mono = pivot_point; i_mono < n_mono; i_mono++){
-                    for (int j = 0; j < 3; j++){
-                        coord[i_mono][j] = trial_coord[i_mono][j];
-                    }
+        /* In this next section if the pivot move yielded an invalid saw, then in order to do 
+           the local moves efficiently we insert the pre-pivot config. in the hash table*/
+        if (!is_still_saw){ // It the new config is not saw we try the local moves on the previous config.
+            for (int i = 0; i < n_hashes; i++){
+                hash_saw.occupancy[hashed_where[whos_hashed[i]]] = 0;
+            }
+            for (int i_mono = pivot_point+1; i_mono < n_mono; i_mono++){
+                for (int j = 0; j < 3; j++){
+                    trial_coord[i_mono][j] = coord[i_mono][j];
                 }
-                for (int i_mono = 0; i_mono < n_mono; i_mono ++){
-                    for (int j = 0; j < 7; j++){
-                        neighbours[i_mono][j] = trial_neighbours[i_mono][j];
-                    }
-                }
-                energy = trial_energy;
-                n_acc++;
+            } 
+            for (int i_mono = 0; i_mono < n_mono; i_mono++){
+                add_to_hash_table(i_mono, trial_coord[i_mono]);
             }
         }
+
+        
+
+        
+
+        //if(is_still_saw){
+        for (int i_local = 0; i_local < n_mono/4; i_local++){
+            /*if(uni_R(mt) < 0.5){
+                single_bead_flip();
+            }
+            else{
+                crankshaft_180();
+            }*/
+            int move = local_move_rand(mt);
+            switch (move){
+                case 0:
+                    single_bead_flip();
+                    break;
+                case 1:
+                    crankshaft_180();
+                    break;
+                case 2:
+                    crankshaft_90_270(1);   // 90 degrees crankshaft
+                    break;
+                case 3:
+                    crankshaft_90_270(-1);  // 270 degrees crankshaft
+                    break;
+                default:
+                    std::cout << "INVALID LOCAL MOVE !!! \n\n\n";
+            }
+            
+        }
+        if (is_still_saw){n_pivots++;}
+        compute_neighbour_list(trial_coord, trial_neighbours);
+        trial_energy = compute_new_energy(trial_neighbours);
+        //std::cout << trial_energy << "\n";
+        delta_energy = trial_energy - energy;
+        if (delta_energy <= 0){ acceptance = 1; }
+        else {acceptance = exp(-delta_energy); }
+        if (acceptance > uni_R(mt)){
+            for (int i_mono = 0; i_mono < n_mono; i_mono++){
+                for (int j = 0; j < 3; j++){
+                    coord[i_mono][j] = trial_coord[i_mono][j];
+                }
+            }
+            for (int i_mono = 0; i_mono < n_mono; i_mono ++){
+                for (int j = 0; j < 7; j++){
+                    neighbours[i_mono][j] = trial_neighbours[i_mono][j];
+                }
+            }
+            energy = trial_energy;
+            n_acc++;
+        }
+        //}
         // the next 3 lines clean up the hash table to make it ready again for use
-        for (int i = 0; i < n_hashes; i++){
-            hash_saw.occupancy[hashed_where[whos_hashed[i]]] = 0;
+        for (int i = 0; i < n_mono; i++){
+            hash_saw.occupancy[hashed_where[i]] = 0;
         }
         
         spins_MC();  // here I run MC on the spin d.o.f's with the current polymer configuration
