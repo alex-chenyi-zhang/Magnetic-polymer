@@ -12,7 +12,7 @@ The MC steps are perfomed as described in the following:
 
 ## To Do list
 ### Part 1: simulator
--✔ Put everything you have written until now in a library (magpol.a) and a main program that calls this library (otherwise code becomes too messy and impossible to use going forward) 
+- ✔ Put everything you have written until now in a library (magpol.a) and a main program that calls this library (otherwise code becomes too messy and impossible to use going forward) 
 - Instead of taking simulation parameters from the command line when the code is launched, write the code in such a way that all the required info comes from an input text file.
 - Separate the part that writes the outputs on files from the "saw_MC::run()" method.
 - Instead of initializing the polymer as a straight rod and the spin configurations randomly, you should also allow the possibility to read a configuration from a file. This is required first of all because when you do the likelihood-free inference part, you don't want to wait for a long equilibration for each set of model parameters, but instead you would want to start from a configuration that is already close to equilibration. The second reason is that as it is now the MC "dynamics" is metastable. Especially in the case of zero external fields and strong coupling between the spins almost all global polymer moves are rejected. The local moves are accepted more easily but they do not change the end-to-end distance.
