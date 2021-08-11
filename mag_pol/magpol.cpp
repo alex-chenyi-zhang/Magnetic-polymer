@@ -1,25 +1,10 @@
+#include "magpol.h"
 #include <iostream>
 #include <random>
 #include <sstream>
 #include <fstream>
 #include <string>
-#include <chrono>
-
-using namespace std;
-using namespace std::chrono;
-
-class linear_hash{
-    public:
-        int M = 5000000;
-        int a[3] = {17,290,4914};
-        int * occupancy;
-        int * monomer_index;
-        int ** key_values;
-        linear_hash();
-        ~linear_hash();
-};
-
-
+using namespace magpol;
 
 linear_hash::linear_hash(){
     occupancy = new int[M];
@@ -45,69 +30,6 @@ linear_hash::~linear_hash(){
     delete [] occupancy;
     delete [] monomer_index;
 }
-
-
-
-class saw_MC{
-    int n_mono, n_steps;
-    int ** coord;                                  // 2D array that contains the coordinates of the monomers
-    int ** trial_coord;
-    int * Ree2;                                    // Here we store the squared end-to-end distance
-    int * spins;                                   // Here I store the spin congiguration of the Ising/Potts subsystem
-    int * trial_spins;
-    float * h_fields;                              // Values of the local fields in the Ising/Potts model
-    float max_field_value = 2;
-    float spin_coupling;
-    float energy = 0;
-    float * energies;
-    float * magnetization;
-    int p_moves[47][2][3] = {};                // The 47 orthogonal transformations of the octahedral group (except identity)
-
-    int ** neighbours;                             /* This is the list of the neighbours of each monomer. Needed to evaluate the hamiltonian.          
-                                                      To compute energy is order n_mono, so is the same order of the other operations needed
-                                                      to propose a move, so I guess it's ok. To increase the efficiency one should compute only
-                                                      the delta energy, but it's not so straighforward as the pivot is a global move. In this 
-                                                      probably a trial_neighbour matrix will be needed*/
-    int ** trial_neighbours;
-
-    std::random_device rd;                         // generates a random seed, to initialize a random engine
-    std::mt19937 mt;
-    std::uniform_real_distribution<double> uni_R;  // uniform in [0,1]. Used to acc/rej MC move
-    std::uniform_int_distribution<int> uni_I_poly; // uniform in [1,n_mono-1]. To pick a random monomer. We don't do pivots around the 0-th monomer 
-    std::uniform_int_distribution<int> uni_I_poly2;// uniform in [1,n_mono-3]. Needed for the one-bead-flip
-    std::uniform_int_distribution<int> uni_I_poly3;// uniform in [1,n_mono-4]. Needed for cranckshaft-type moves
-    std::uniform_int_distribution<int> uni_G;      // uniform in [0,47-1]. To pick a random element of the symmetry group
-    std::uniform_int_distribution<int> uni_spins;  // random number picked between {-1,0,+1}
-    std::uniform_int_distribution<int> uni_spins2; // random number picked between {0,1}
-    std::uniform_int_distribution<int> local_move_rand;  // allows you to choose one of the 4 implemented local moves
-    int perms[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
-    int tr_signs[8][3] = {{1,1,1},{1,1,-1},{1,-1,1},{1,-1,-1},       
-    {-1,1,1},{-1,1,-1},{-1,-1,1},{-1,-1,-1}};      // by combining perm's and sign comb's you obtain the 48 pivot moves
-    linear_hash hash_saw;                          // We declare here the hash table that will be used for self-avoidance checks
-    int * hashed_where;                            // at each attempted pivot you store here the hashed coordinates of the monomers
-                                                   // :this is useful for quick cleanup of the hashtable.
-    int * whos_hashed;                             // constains the sequence of monomers used for a self-av check
-    int n_hashes;                                  // Tells you in each self_av. check how many monomers you inserted in the hash table
-    public:
-        saw_MC(int,int,float);                           //constructor
-        ~saw_MC();                                 //destructor
-        void try_pivot(int,int);
-        int hash_function(int*,int,int*);
-        bool check_saw(int); 
-        void compute_neighbour_list(int**, int**);          // if argument is 1 uses coord, if it is 0 uses trial_coord  
-        float compute_new_energy(int**);
-        void spins_MC(void);
-        void remove_from_hash_table(int);
-        bool add_to_hash_table(int, int*);
-        bool check_site_occupancy(int, int*);
-        void single_bead_flip(void);
-        void crankshaft_180(void);
-        void crankshaft_90_270(int);
-        void run(void);      
-        void write_results_on_file(void);            
-};
-
-
 
 /*********************************************************************************************/
 /*********************************************************************************************/
@@ -176,6 +98,7 @@ saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1)
             count++;
         }
     }
+    
 }
 
 
@@ -692,16 +615,16 @@ void saw_MC::run(){
 }
 
 void saw_MC::write_results_on_file(){
-    ofstream myfile;
-    ofstream myfile2;
-    ofstream myfile3;
-    ofstream myfile4;
-    ofstream myfile5;
-    myfile.open ("final_config_" + to_string(n_mono) + "_" + to_string(spin_coupling) + ".txt");
-    myfile2.open ("e2e_dist_" + to_string(n_mono) + "_" + to_string(spin_coupling) + ".txt");
-    myfile3.open ("energies_" + to_string(n_mono) + "_" + to_string(spin_coupling) + ".txt");
-    myfile4.open ("final_spinconf_" + to_string(n_mono) + "_" + to_string(spin_coupling) +".txt");
-    myfile5.open ("magnetization_" + to_string(n_mono) + "_" + to_string(spin_coupling) + ".txt");
+    std::ofstream myfile;
+    std::ofstream myfile2;
+    std::ofstream myfile3;
+    std::ofstream myfile4;
+    std::ofstream myfile5;
+    myfile.open ("final_config_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) + ".txt");
+    myfile2.open ("e2e_dist_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) + ".txt");
+    myfile3.open ("energies_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) + ".txt");
+    myfile4.open ("final_spinconf_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) +".txt");
+    myfile5.open ("magnetization_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) + ".txt");
     for (int i = 0; i < n_mono; i++){
         for(int j = 0; j < 3; j++){
             myfile << coord[i][j] << ' ';
@@ -722,34 +645,4 @@ void saw_MC::write_results_on_file(){
 }
 
 
-/*******************************************************************************************************/
-/*******************************************************************************************************/
-/*******************************************************************************************************/
 
-
-int main(int argc, char* argv[]){
-//int main(){
-    stringstream string1(argv[1]);
-    stringstream string2(argv[2]);
-    stringstream string3(argv[3]);
-    int N_monomers;
-    int simul_length;
-    float J;
-    string1 >> N_monomers;
-    string2 >> simul_length;
-    string3 >> J;
-    std::cout << argv[0] << "\n";
-    std::cout << "The number of monomers is: " << N_monomers << "\n";
-    std::cout << "The length of the simulation is: " << simul_length << "\n";
-    std::cout << "The coupling values is: " << J << "\n";
-    
-    auto start = high_resolution_clock::now();
-    saw_MC simulation(N_monomers, simul_length, J); 
-    simulation.run();
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - start);
-    std::cout << duration.count() << "\n";
-
-    simulation.write_results_on_file();
-    return 0;
-}
