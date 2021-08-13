@@ -19,12 +19,16 @@ class saw_MC{
     int ** coord;                                  // 2D array that contains the coordinates of the monomers
     int ** trial_coord;
     int * Ree2;                                    // Here we store the squared end-to-end distance
+    float *Rg2;
     int * spins;                                   // Here I store the spin congiguration of the Ising/Potts subsystem
     int * trial_spins;
     float * h_fields;                              // Values of the local fields in the Ising/Potts model
     float max_field_value = 2;
     float spin_coupling;
     float energy = 0;
+    float alpha_h;                           // alpha is between 0 and 1. it is the importance of the polymer part of the hamiltonian vs the 
+                                                   // the part that ONLY depends on the spins i.e. the parts with the external fields
+    float beta_temp;
     float * energies;
     float * magnetization;
     int p_moves[47][2][3] = {};                // The 47 orthogonal transformations of the octahedral group (except identity)
@@ -55,7 +59,7 @@ class saw_MC{
     int * whos_hashed;                             // constains the sequence of monomers used for a self-av check
     int n_hashes;                                  // Tells you in each self_av. check how many monomers you inserted in the hash table
     public:
-        saw_MC(int,int,float);                           //constructor
+        saw_MC(int,int,float,float,float);                           //constructor
         ~saw_MC();                                 //destructor
         void try_pivot(int,int);
         int hash_function(int*,int,int*);
@@ -70,7 +74,8 @@ class saw_MC{
         void crankshaft_180(void);
         void crankshaft_90_270(int);
         void run(void);      
-        void write_results_on_file(void);            
+        void write_results_on_file(void);   
+        float gyr_rad_square(void);         
 };
 
 

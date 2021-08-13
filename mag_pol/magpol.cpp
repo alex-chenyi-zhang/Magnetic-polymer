@@ -39,14 +39,17 @@ linear_hash::~linear_hash(){
    attributes of the class. It takes for now as parameters the 
    number of MC steps the simulation lasts and the length of the polymer ecc...
 */
-saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
+saw_MC::saw_MC(int x, int y, float j_spins, float alpha, float inv_T) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
                                 uni_I_poly2(0,x-3), uni_I_poly3(0,x-4), local_move_rand(0,3), uni_spins2(0,1), mt(rd()){   //CONSTRUCTOR // mt(rd())--> This for a random seed
     n_mono = x;
     n_steps = y; 
     spin_coupling = j_spins;
+    alpha_h = alpha;
+    beta_temp = inv_T;
     coord = new int*[n_mono];
     trial_coord = new int*[n_mono];
     Ree2 = new int[n_steps];
+    Rg2 = new float[n_steps];
     energies = new float[n_steps];
     magnetization = new float[n_steps];
     spins = new int[n_mono];
@@ -69,9 +72,10 @@ saw_MC::saw_MC(int x, int y, float j_spins) : uni_R(0.0, 1.0), uni_I_poly(1,x-1)
         trial_coord[i][0] = i;
         trial_coord[i][1] = 0;
         trial_coord[i][2] = 0;
-        spins[i] = uni_spins(mt);//*2-1;
+        //spins[i] = uni_spins(mt);   // this is potts -1,0,+1
+        spins[i] = uni_spins2(mt)*2-1; // this is ising -1,+1
         trial_spins[i] = spins[i];
-        h_fields[i] = 0.0;//(uni_R(mt)-0.5)*max_field_value*2;  /*LET'S USE O-FIELDS FOR NOW TO SEE IF WE CAN QUALITATIVELY GET THE RESULTS FROM michieletto ET AL*/
+        h_fields[i] = 10;//(uni_R(mt)-0.5)*max_field_value*2;  
         neighbours[i][0] = 0;     // starting from a straight rod no one has any neighbour
         trial_neighbours[i][0] = 0;
         for (int j = 0; j < 5; j++){
@@ -112,6 +116,7 @@ saw_MC::~saw_MC(){    // DESTRUCOR
     delete [] coord;
     delete [] trial_coord;
     delete [] Ree2;
+    delete [] Rg2;
     delete [] energies;
     delete [] magnetization;
     delete [] hashed_where;
@@ -447,13 +452,17 @@ void saw_MC::compute_neighbour_list(int **coo, int **near){ // this method is ru
 
 float saw_MC::compute_new_energy(int **near){
     float ENE = 0;
+    float ENE_J = 0;
     for (int i_mono = 0; i_mono < n_mono; i_mono++){
         ENE = ENE - h_fields[i_mono] * spins[i_mono];
+        ENE = ENE * (1-alpha_h);
         for (int j = 0; j < near[i_mono][0]; j++){
-            if (( spins[i_mono] == spins[near[i_mono][j+1]] ) && (spins[i_mono] != 0)) { 
-                ENE = ENE - spin_coupling/2;
-            }
+            /*if (( spins[i_mono] == spins[near[i_mono][j+1]] ) && (spins[i_mono] != 0)) { 
+                ENE_J = ENE_J - spin_coupling/2;
+            }*/
+            ENE_J = ENE_J - spins[i_mono] * spins[near[i_mono][j+1]] * spin_coupling/2;
         }
+        ENE = ENE + ENE_J * alpha_h;
     }
     return ENE;
 }
@@ -473,29 +482,33 @@ void saw_MC::spins_MC(){
         flip_candidate = uni_I_poly(mt); // pick a random spin to try to flip
         
         local_ene = 0;
-        local_ene = local_ene - h_fields[flip_candidate] * spins[flip_candidate];
+        local_ene = local_ene - h_fields[flip_candidate] * spins[flip_candidate] * (1-alpha_h);
         for (int j = 0; j < neighbours[flip_candidate][0]; j++){
-            if (( spins[flip_candidate] == spins[neighbours[flip_candidate][j+1]] ) && (spins[flip_candidate] != 0)) { 
-                local_ene = local_ene - spin_coupling;
-            }
+            /*if (( spins[flip_candidate] == spins[neighbours[flip_candidate][j+1]] ) && (spins[flip_candidate] != 0)) { 
+                local_ene = local_ene - spin_coupling * alpha_h;
+            }*/
+            local_ene = local_ene - spin_coupling * alpha_h * spins[flip_candidate] * spins[neighbours[flip_candidate][j+1]];
         }
     
-        if(spins[flip_candidate] == -1){ trial_spin_value = uni_spins2(mt); } //pick between 0 and 1
-        else if(spins[flip_candidate] == 1) { trial_spin_value = -uni_spins2(mt); } //-------0 and -1
-        else { trial_spin_value = uni_spins2(mt)*2 - 1; }                     //------------ 1 and -1
+        //if(spins[flip_candidate] == -1){ trial_spin_value = uni_spins2(mt); } //pick between 0 and 1
+        //else if(spins[flip_candidate] == 1) { trial_spin_value = -uni_spins2(mt); } //-------0 and -1
+        //else { trial_spin_value = uni_spins2(mt)*2 - 1; }                     //------------ 1 and -1
+
+        trial_spin_value = -spins[flip_candidate];
 
         trial_local_ene = 0;
-        trial_local_ene = trial_local_ene - h_fields[flip_candidate] * trial_spin_value;
+        trial_local_ene = trial_local_ene - h_fields[flip_candidate] * trial_spin_value * (1-alpha_h);
         for (int j = 0; j < neighbours[flip_candidate][0]; j++){
-            if (( trial_spin_value == spins[neighbours[flip_candidate][j+1]] ) && (trial_spin_value != 0)) { 
-                trial_local_ene = trial_local_ene - spin_coupling;
-            }
+            /*if (( trial_spin_value == spins[neighbours[flip_candidate][j+1]] ) && (trial_spin_value != 0)) { 
+                trial_local_ene = trial_local_ene - spin_coupling * alpha_h;
+            }*/
+            trial_local_ene = trial_local_ene - spin_coupling * alpha_h * trial_spin_value * spins[neighbours[flip_candidate][j+1]];
         }
         delta_ene = trial_local_ene - local_ene;
         //std::cout << delta_ene << "\n";
 
         if (delta_ene <= 0){ acc = 1; }
-        else {acc = exp(-delta_ene); }
+        else {acc = exp(-delta_ene*beta_temp); }
 
         if (acc > uni_R(mt)){
             energy = energy + delta_ene;
@@ -504,6 +517,24 @@ void saw_MC::spins_MC(){
     }
 }
 
+float saw_MC::gyr_rad_square(){
+    float Rcm[] = {0,0,0};
+    for (int i_mono = 0; i_mono < n_mono; i_mono++){
+        for (int j = 0; j < 3; j++){
+            Rcm[j] += coord[i_mono][j];
+        }
+    }
+    for (int j = 0; j < 3; j++){
+        Rcm[j] = Rcm[j]/n_mono;
+    }
+    float rg2 = 0;
+    for (int i_mono = 0; i_mono < n_mono; i_mono++){
+        for (int j = 0; j < 3; j++){
+            rg2 += (coord[i_mono][j]-Rcm[j])*(coord[i_mono][j]-Rcm[j]);
+        }
+    }
+    return rg2/n_mono;
+}
 
 void saw_MC::run(){
     std::cout << check_saw(1) << "\n";
@@ -523,7 +554,8 @@ void saw_MC::run(){
     float acceptance;
     float magnet;
     for (int i = 0; i < n_steps; i++){
-        Ree2[i] = coord[n_mono-1][0]*coord[n_mono-1][0]+coord[n_mono-1][1]*coord[n_mono-1][1]+coord[n_mono-1][2]*coord[n_mono-1][2];
+        //Ree2[i] = coord[n_mono-1][0]*coord[n_mono-1][0]+coord[n_mono-1][1]*coord[n_mono-1][1]+coord[n_mono-1][2]*coord[n_mono-1][2];
+        Rg2[i] = gyr_rad_square();
         energies[i] = energy;
         magnet = 0;
         for (int i_mono = 0; i_mono < n_mono; i_mono++){
@@ -585,7 +617,7 @@ void saw_MC::run(){
         //std::cout << trial_energy << "\n";
         delta_energy = trial_energy - energy;
         if (delta_energy <= 0){ acceptance = 1; }
-        else {acceptance = exp(-delta_energy); }
+        else {acceptance = exp(-delta_energy*beta_temp); }
         if (acceptance > uni_R(mt)){
             for (int i_mono = 0; i_mono < n_mono; i_mono++){
                 for (int j = 0; j < 3; j++){
@@ -620,11 +652,12 @@ void saw_MC::write_results_on_file(){
     std::ofstream myfile3;
     std::ofstream myfile4;
     std::ofstream myfile5;
-    myfile.open ("final_config_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) + ".txt");
-    myfile2.open ("e2e_dist_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) + ".txt");
-    myfile3.open ("energies_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) + ".txt");
-    myfile4.open ("final_spinconf_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) +".txt");
-    myfile5.open ("magnetization_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) + ".txt");
+    myfile.open ("final_config_" + std::__cxx11::to_string(n_mono) + "_T_" + std::__cxx11::to_string(beta_temp) + ".txt");
+    //myfile2.open ("e2e_dist_" + std::__cxx11::to_string(n_mono) + "_" + std::__cxx11::to_string(spin_coupling) + ".txt");
+    myfile2.open ("RG2_" + std::__cxx11::to_string(n_mono) + "_T_" + std::__cxx11::to_string(beta_temp) + ".txt");
+    myfile3.open ("energies_" + std::__cxx11::to_string(n_mono) + "_T_" + std::__cxx11::to_string(beta_temp) + ".txt");
+    myfile4.open ("final_spinconf_" + std::__cxx11::to_string(n_mono) + "_T_" + std::__cxx11::to_string(beta_temp) +".txt");
+    myfile5.open ("magnetization_" + std::__cxx11::to_string(n_mono) + "_T_" + std::__cxx11::to_string(beta_temp) + ".txt");
     for (int i = 0; i < n_mono; i++){
         for(int j = 0; j < 3; j++){
             myfile << coord[i][j] << ' ';
@@ -633,7 +666,7 @@ void saw_MC::write_results_on_file(){
         myfile4 << spins[i] << "\n";
     }
     for (int i = 0; i < n_steps; i++){
-        myfile2 << Ree2[i] << "\n";
+        myfile2 << Rg2[i] << "\n";
         myfile3 << energies[i] << "\n";
         myfile5 << magnetization[i] << "\n";
     }
