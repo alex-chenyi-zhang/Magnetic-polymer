@@ -39,6 +39,13 @@ linear_hash::~linear_hash(){
    attributes of the class. It takes for now as parameters the 
    number of MC steps the simulation lasts and the length of the polymer ecc...
 */
+
+Test::Test(int a, int b){
+    x = a;
+    y = b;
+}
+
+//saw_MC::saw_MC(){}
 saw_MC::saw_MC(int x, int y, int z, float j_spins, float alpha, float inv_T) : uni_R(0.0, 1.0), uni_I_poly(1,x-1), uni_G(0,47-1), uni_spins(-1,1), 
                                 uni_I_poly2(0,x-3), uni_I_poly3(0,x-4), local_move_rand(0,3), uni_spins2(0,1), mt(rd()){   //CONSTRUCTOR // mt(rd())--> This for a random seed
     n_mono = x;
@@ -131,7 +138,38 @@ saw_MC::~saw_MC(){    // DESTRUCOR
 }
 
 
+/*********************************************************************************************/
+float saw_MC::get_beta(){
+    return beta_temp;
+}
+float saw_MC::get_ene(){
+    return energy;
+}
+void saw_MC::copy_spins(int temp_spins[]){
+    for (int i = 0; i < n_mono; i++){
+        temp_spins[i] = spins[i];
+    }
+}
+void saw_MC::copy_coords(int **temp_coo){
+    for (int i = 0; i < 5; i++){
+        for (int j = 0; j < 3; j++){
+            temp_coo[i][j] = coord[i][j];
+        }
+    }
+}
 
+void saw_MC::set_spins(int temp_spins[]){
+    for (int i = 0; i < n_mono; i++){
+        spins[i] = temp_spins[i];
+    }
+}
+void saw_MC::set_coords(int **temp_coo){
+    for (int i = 0; i < n_mono; i++){
+        for (int j = 0; j < 3; j++){
+            coord[i][j] = temp_coo[i][j];
+        }
+    }
+}
 /*********************************************************************************************/
 /* This function makes the g-th transformation on the k-th pivot point
    and stores the transformed configuration in trial_coord. One then 
@@ -539,7 +577,12 @@ float saw_MC::gyr_rad_square(){
 }
 
 void saw_MC::run(){
-    std::cout << check_saw(1) << "\n";
+    for (int i_mono = 0; i_mono < n_mono; i_mono++){
+        for (int j = 0; j < 3; j++){
+            trial_coord[i_mono][j] = coord[i_mono][j];
+        }
+    }
+    check_saw(1);
     compute_neighbour_list(coord, neighbours);
     for (int i = 0; i < n_hashes; i++){
         hash_saw.occupancy[hashed_where[whos_hashed[i]]] = 0;
@@ -569,7 +612,7 @@ void saw_MC::run(){
         try_pivot(pivot_point,transformation);
         is_still_saw = check_saw(pivot_point);
         if (i%10000 == 0){
-            std::cout << "i_step = "<< i << ' '<<pivot_point << ' ' << transformation <<' '<< is_still_saw << "\n";
+            std::cout <<"i_step = "<< i << ' '<<pivot_point << ' ' << transformation <<' '<< is_still_saw << "  invT = " << beta_temp << "\n";
         }
 
         /* In this next section if the pivot move yielded an invalid saw, then in order to do 
@@ -643,8 +686,8 @@ void saw_MC::run(){
         spins_MC();  // here I run MC on the spin d.o.f's with the current polymer configuration
     }
 
-    std::cout << "Number of successful pivot moves: "<< n_pivots << "\n";
-    std::cout << "Number of actually accepted pivot moves: "<< n_acc << "\n";
+    //std::cout << "Number of successful pivot moves: "<< n_pivots << "\n";
+    //std::cout << "Number of actually accepted pivot moves: "<< n_acc << "\n";
     done_strides++;
 }
 

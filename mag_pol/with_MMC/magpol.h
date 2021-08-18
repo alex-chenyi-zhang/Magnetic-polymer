@@ -2,6 +2,7 @@
 #define MAGPOL_H
 
 #include <random>
+#include <iostream>
 namespace magpol{
 class linear_hash{
     public:
@@ -62,6 +63,7 @@ class saw_MC{
     int * whos_hashed;                             // constains the sequence of monomers used for a self-av check
     int n_hashes;                                  // Tells you in each self_av. check how many monomers you inserted in the hash table
     public:
+        //saw_MC(void);                  // dummy constructor, needed if you want use arrays of this type and call the actual constructors separately after memory allocation
         saw_MC(int,int,int,float,float,float);                           //constructor
         ~saw_MC();                                 //destructor
         void try_pivot(int,int);
@@ -78,7 +80,20 @@ class saw_MC{
         void crankshaft_90_270(int);
         void run(void);      
         void write_results_on_file(void);   
-        float gyr_rad_square(void);         
+        float gyr_rad_square(void);    
+        float get_beta(void);
+        float get_ene(void);
+        void copy_spins(int*);
+        void copy_coords(int**);     
+        void set_spins(int*);
+        void set_coords(int**);
+};
+
+class Test{
+    int x, y;
+    public:
+        Test(int, int);
+        void print() {std::cout << x << " " << y << "\n";}
 };
 
 
