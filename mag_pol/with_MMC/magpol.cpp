@@ -151,7 +151,7 @@ void saw_MC::copy_spins(int temp_spins[]){
     }
 }
 void saw_MC::copy_coords(int **temp_coo){
-    for (int i = 0; i < 5; i++){
+    for (int i = 0; i < n_mono; i++){
         for (int j = 0; j < 3; j++){
             temp_coo[i][j] = coord[i][j];
         }

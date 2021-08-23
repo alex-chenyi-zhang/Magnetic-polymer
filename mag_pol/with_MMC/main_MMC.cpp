@@ -14,18 +14,18 @@ int main(int argc, char* argv[]){
     std::stringstream string4(argv[4]);
     std::stringstream string5(argv[5]);
     std::stringstream string6(argv[6]);
+    std::stringstream string7(argv[7]);
 
-    int n_temps = 10;                   // number of temperatures
+    int n_temps;// = 20;                   // number of temperatures
     std::random_device rand_dev;                         // generates a random seed, to initialize a random engine
     std::mt19937 mer_twist;
-    std::uniform_real_distribution<double> uni_01(0.0, 1.0);  // uniform in [0,1]. Used to acc/rej MC move
-    std::uniform_int_distribution<int> uni_temps(0, n_temps-2);
     int N_monomers;
     int stride_length;
     int number_of_strides;
     float J;
     float alpha;
     float inv_kbT;
+    float max_inv_temp = 0.3;
     
     string1 >> N_monomers;
     string2 >> stride_length;
@@ -33,6 +33,10 @@ int main(int argc, char* argv[]){
     string4 >> J;
     string5 >> alpha;
     string6 >> inv_kbT;
+    string7 >> n_temps;
+
+    std::uniform_real_distribution<double> uni_01(0.0, 1.0);  // uniform in [0,1]. Used to acc/rej MC move
+    std::uniform_int_distribution<int> uni_temps(0, n_temps-2);
 
 
     int * temporary_spins1 = new int[N_monomers];
@@ -57,13 +61,14 @@ int main(int argc, char* argv[]){
     std::cout << "The coupling values is: " << J << "\n";
     std::cout << "The value of alpha is: " << alpha << "\n";
     std::cout << "The value of the inverse temperature is: " << inv_kbT << "\n";
+    std::cout << "The number of temperatures is: " << n_temps << "\n";
     
     
     auto start = high_resolution_clock::now();
     saw_MC** simulations = new saw_MC*[n_temps];
     // do many parallel simulations with inverse temperatures uniformly spaced between 0 and the value of interest
     for (int i = 0; i < n_temps; i++){
-        simulations[i] = new saw_MC(N_monomers, stride_length, number_of_strides, J, alpha, inv_kbT-inv_kbT*i/(n_temps-1)); 
+        simulations[i] = new saw_MC(N_monomers, stride_length, number_of_strides, J, alpha, inv_kbT-(inv_kbT-max_inv_temp)*i/(n_temps-1)); 
     }
     int accepted_swaps = 0;
 
@@ -88,6 +93,13 @@ int main(int argc, char* argv[]){
             simulations[swap+1]->copy_spins(temporary_spins2);
             simulations[swap]->copy_coords(temporary_coords1);
             simulations[swap+1]->copy_coords(temporary_coords2);
+
+            /*for (int i_mono = 0; i_mono < N_monomers; i_mono++){
+                for (int j = 0; j < 3; j++){
+                    std::cout << temporary_coords1[i_mono][j] << " ";
+                }
+                std::cout << "\n";
+            }*/
 
             simulations[swap]->set_spins(temporary_spins2);
             simulations[swap+1]->set_spins(temporary_spins1);
