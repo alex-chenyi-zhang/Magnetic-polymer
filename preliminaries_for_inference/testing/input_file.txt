@@ -1,0 +1,11 @@
+n_mono 100
+stride_length 2
+n_strides 1
+n_temps 10
+spins_coupling 1.0
+alpha 0.0
+inverse_temperature 1.0
+initialize_from_files 1
+conf_file final_config_100.txt
+spins_file final_spinconf_100.txt
+fields_file external_fields_100.txt
