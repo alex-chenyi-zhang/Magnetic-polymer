@@ -455,16 +455,14 @@ float saw_MC::compute_new_energy(int **near){
     float ENE_J = 0;
     for (int i_mono = 0; i_mono < n_mono; i_mono++){
         ENE = ENE - h_fields[i_mono] * spins[i_mono];
-        ENE = ENE * (1-alpha_h);
         for (int j = 0; j < near[i_mono][0]; j++){
             /*if (( spins[i_mono] == spins[near[i_mono][j+1]] ) && (spins[i_mono] != 0)) { 
                 ENE_J = ENE_J - spin_coupling/2;
             }*/
             ENE_J = ENE_J - spins[i_mono] * spins[near[i_mono][j+1]] * spin_coupling/2;
         }
-        ENE = ENE + ENE_J * alpha_h;
     }
-    return ENE;
+    return ENE*(1-alpha_h) + ENE_J*(alpha_h);
 }
 
 
@@ -554,7 +552,6 @@ void saw_MC::run(){
     float acceptance;
     float magnet;
     for (int i = 0; i < n_steps; i++){
-        //Ree2[i] = coord[n_mono-1][0]*coord[n_mono-1][0]+coord[n_mono-1][1]*coord[n_mono-1][1]+coord[n_mono-1][2]*coord[n_mono-1][2];
         Rg2[i] = gyr_rad_square();
         energies[i] = energy;
         magnet = 0;
